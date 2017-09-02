@@ -83,6 +83,35 @@ class DirItem {
         this._edited_time = buffer.readUintBE(146, 8);
     }
 
+    get name() {
+        return this._name;
+    }
+
+    get attr() {
+        return this._attr;
+    }
+
+    get type() {
+        return this._type;
+    }
+
+    get size() {
+        return this._size;
+    }
+
+    get number() {
+        return this._number;
+    }
+
+    get created_time() {
+        return this._created_time;
+    }
+
+    get edited_time() {
+        return this._edited_time;
+    }
+
+
 }
 
 class DirStruct {
@@ -101,7 +130,7 @@ class DirStruct {
 
 };
 
-exports.readDirStructFromBuffer = readDirStructFromBuffer;
-exports.writeDirStructToBuffer = writeDirStructToBuffer;
+exports.readDirStructFromDisk = readDirStructFromDisk;
+exports.writeDirStructToDisk = writeDirStructToDisk;
 exports.DirItem = DirItem;
 exports.DirStruct = DirStruct;
