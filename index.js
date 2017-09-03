@@ -149,7 +149,8 @@ exports.open = (filename, flag) => {
 
             dirItem = new dirstruct.DirItem();
             dirItem.name = realname;
-            dirItem.number = beginBlockNum;
+            dirItem.dir_num = fatherResult.number;
+            dirItem.begin_num = beginBlockNum;
             dirItem.created_time = new Date().getTime();
             dirItem.edited_time = new Date().getTime();
 
@@ -165,7 +166,10 @@ exports.open = (filename, flag) => {
     let handle = findHandle();
     let openedfile = new OpenedFile.OpenedFile();
     openedfile.filename = filename;
+    openedfile.begin_num = dirItem.begin_num;
     openedfile.flag = flag;
+    openedfile.size = dirItem.size;
+    openedfile.ptr_block = openedfile.begin_num;
     openedFileHandles[handle] = openedfile
     return handle;
 }
@@ -174,8 +178,62 @@ exports.close = (handle) => {
     openedFileHandles[handle] = undefined;
 }
 
-exports.read = () => {
-    return 0;
+exports.seek = (fd, position) => {
+    if (openedFileHandles[fd] === undefined) 
+        throw new Error("fd is not valid");
+    let openedfile = openedFileHandles[fd];
+    if (position > openedfile.size) {
+        throw new Error("out of file");
+    }
+    let blocknum = openedfile.begin_num;
+    let blockID = parseInt(position / BLOCK_SIZE);
+    let blockOffset = position % BLOCK_SIZE;
+    for (let i = 0; i < blockID; i++) {
+        blocknum = FATBuffer[blocknum];
+    }
+    openedfile.ptr_block = blocknum;
+    openedfile.ptr_byte = blockOffset;
+}
+
+exports.read = (fd, buf, offset, length) => {
+    if (openedFileHandles[fd] === undefined) 
+        throw new Error("fd is not valid");
+    let openedfile = openedFileHandles[fd];
+    let tmp_length = length;
+    let tmp_buf = Buffer.alloc(length);
+    let tmp_offset = 0;
+    while (tmp_offset < length) {
+        let bytesCount = Math.min(BLOCK_SIZE - openedfile.ptr_byte, length - tmp_offset);
+        fs.readSync(FileDiskHandle, tmp_buf, tmp_offset, bytesCount, openedfile.ptr_block * BLOCK_SIZE + openedfile.ptr_byte);
+        tmp_offset += bytesCount;
+        openedfile.ptr_block = FATBuffer[openedfile.ptr_block];
+        openedfile.ptr_byte = 0;
+    }
+    tmp_buf.copy(buf, offset, 0, length);
+}
+
+exports.write = (fd, buf, offset, length) => {
+    if (openedFileHandles[fd] === undefined) 
+        throw new Error("fd is not valid");
+    let openedfile = openedFileHandles[fd];
+    while (length > 0) {
+        let bytesCount = Math.min(BLOCK_SIZE - openedfile.ptr_byte, length - offset);
+        fs.writeSync(FileDiskHandle, buf, offset, bytesCount, openedfile.ptr_block * BLOCK_SIZE + openedfile.ptr_byte);
+        offset += bytesCount;
+        length -= bytesCount;
+        if (length > 0 && FATBuffer[openedfile.ptr_block] === -1) {
+            let nextBlockNum = findNullFATBlockNum();
+            FATBuffer[openedfile.ptr_block] = nextBlockNum;
+            FATBuffer[nextBlockNum] = -1;
+            WriteFAT(FileDiskHandle, FATBuffer);
+            openedfile.ptr_byte = 0;
+            openedfile.ptr_block = nextBlockNum;
+        }
+    }
+}
+
+exports.stat = (filename) => {
+    throw new Error("not implemented");
 }
 
 exports.remove = (filename) => {
