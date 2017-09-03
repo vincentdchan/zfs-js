@@ -206,8 +206,12 @@ exports.read = (fd, buf, offset, length) => {
         let bytesCount = Math.min(BLOCK_SIZE - openedfile.ptr_byte, length - tmp_offset);
         fs.readSync(FileDiskHandle, tmp_buf, tmp_offset, bytesCount, openedfile.ptr_block * BLOCK_SIZE + openedfile.ptr_byte);
         tmp_offset += bytesCount;
-        openedfile.ptr_block = FATBuffer[openedfile.ptr_block];
-        openedfile.ptr_byte = 0;
+        if (openedfile.ptr_byte >= BLOCK_SIZE) {
+            openedfile.ptr_block = FATBuffer[openedfile.ptr_block];
+            openedfile.ptr_byte = 0;
+        } else {
+            openedfile.ptr_byte += bytesCount;
+        }
     }
     tmp_buf.copy(buf, offset, 0, length);
 }
@@ -228,6 +232,8 @@ exports.write = (fd, buf, offset, length) => {
             WriteFAT(FileDiskHandle, FATBuffer);
             openedfile.ptr_byte = 0;
             openedfile.ptr_block = nextBlockNum;
+        } else {
+            openedfile.ptr_byte += bytesCount;
         }
     }
 }
