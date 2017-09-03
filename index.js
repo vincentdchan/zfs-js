@@ -39,6 +39,15 @@ function findHandle() {
     return result;
 }
 
+function findNullFATBlockNum() {
+    for (let i = 2; i < BLOCK_NUM; i++) {
+        if (FATBuffer[i] === 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 function ReadFAT(fd, fatBuffer) {
     let bytesNumber = 256 * 2;
     let buffer = Buffer.alloc(bytesNumber);
@@ -136,13 +145,19 @@ exports.open = (filename, flag) => {
     if (dirItem === null) {
         // file not exists
         if (flag & ZFILE_FLAG_WRITE) { // create the file
+            let beginBlockNum = findNullFATBlockNum();
+
             dirItem = new dirstruct.DirItem();
             dirItem.name = realname;
+            dirItem.number = beginBlockNum;
             dirItem.created_time = new Date().getTime();
             dirItem.edited_time = new Date().getTime();
 
             fatherResult.struct.data.push(dirItem);
             dirstruct.writeDirStructToDisk(FileDiskHandle, fatherResult.number * BLOCK_SIZE, fatherResult.struct);
+
+            FATBuffer[beginBlockNum] = -1;
+            WriteFAT(FileDiskHandle, FATBuffer);
         } else {
             throw new Error("file not exists");
         }
