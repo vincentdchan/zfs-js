@@ -15,8 +15,8 @@ const ZFILE_FLAG_READ = 0x1;
 const ZFILE_FLAG_WRITE = 0x2;
 const ZFILE_FLAG_APPEND = 0x4;
 
-const ZFILE_TYPE_FILE = 0x1;
-const ZFILE_TYPE_DIR = 0x2;
+const ZFILE_TYPE_FILE = 0x0;
+const ZFILE_TYPE_DIR = 0x1;
 
 let FATBuffer = [];
 let FileDiskHandle;
@@ -244,6 +244,46 @@ exports.stat = (filename) => {
 
 exports.remove = (filename) => {
 
+}
+
+exports.createdir = (filename) => {
+    if (filename[0] != '/') {
+        throw new Error("The path must starts with '/'");
+    }
+    let slices = filename.split('/').slice(1);  // slice and remove the first element
+    let realname = slices[slices.length - 1];
+    let fatherResult = getFatherDirStruct(slices);
+    let dirItem = findChildFromDirStruct(fatherResult.struct, realname);
+    if (dirItem !== null) {
+        // file exists
+        throw new Error("file already exists");
+    } 
+    let beginBlockNum = findNullFATBlockNum();
+
+    dirItem = new dirstruct.DirItem();
+    dirItem.name = realname;
+    dirItem.type = ZFILE_TYPE_DIR;
+    dirItem.dir_num = fatherResult.number;
+    dirItem.begin_num = beginBlockNum;
+    dirItem.created_time = new Date().getTime();
+    dirItem.edited_time = new Date().getTime();
+
+    fatherResult.struct.data.push(dirItem);
+    dirstruct.writeDirStructToDisk(FileDiskHandle, fatherResult.number * BLOCK_SIZE, fatherResult.struct);
+
+    FATBuffer[beginBlockNum] = -1;
+    WriteFAT(FileDiskHandle, FATBuffer);
+
+    let newDir = new dirstruct.DirStruct();
+    let fatherItem = new dirstruct.DirItem();
+    fatherItem.name = "..";
+    fatherItem.type = ZFILE_TYPE_DIR;
+    fatherItem.dir_num = beginBlockNum;
+    fatherItem.begin_num = beginBlockNum;
+    fatherItem.created_time = new Date().getTime();
+    fatherItem.edited_time = new Date().getTime();
+    newDir.data.push(fatherItem);
+    dirstruct.writeDirStructToDisk(FileDiskHandle, beginBlockNum * BLOCK_SIZE, newDir);
 }
 
 exports.getFATValue = (index) => {

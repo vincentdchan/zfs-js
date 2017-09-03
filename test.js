@@ -9,5 +9,12 @@ zfs.seek(fd, 0);
 let buf2 = Buffer.alloc(8);
 zfs.read(fd, buf2, 0, 8);
 console.log(buf2);
+
 zfs.close(fd);
+
+fd = zfs.open('/home/cdz.txt', zfs.ZFILE_FLAG_WRITE);
+zfs.write(fd, buf1, 0, 4);
+
+zfs.close(fd);
+
 zfs.disconnect();
