@@ -306,7 +306,7 @@ exports.createdir = (filename) => {
     fatherItem.name = "..";
     fatherItem.type = ZFILE_TYPE_DIR;
     fatherItem.dir_num = beginBlockNum;
-    fatherItem.begin_num = beginBlockNum;
+    fatherItem.begin_num = fatherResult.number;
     fatherItem.created_time = new Date().getTime();
     fatherItem.edited_time = new Date().getTime();
     newDir.data.push(fatherItem);
