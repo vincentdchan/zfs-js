@@ -13,6 +13,9 @@ function readDirStructFromDisk(fd, offset) {
     let lenBuf = Buffer.alloc(4);
     fs.readSync(fd, lenBuf, 0, 4, offset);
     let len = lenBuf.readInt32BE(0);
+    if (len < 0 || len > 15) {
+        throw new Error("read dir struct error");
+    }
     offset += 4;
     for (let i = 0; i < len; i++) {
         // read item

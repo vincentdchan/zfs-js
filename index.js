@@ -102,10 +102,10 @@ function findChildDirStructFromDirStruct(father, children_name) {
     if (child.type !== ZFILE_TYPE_DIR ) {
         throw new Error("target is not a dir");
     }
-    let childDirStruct = dirstruct.readDirStructFromDisk(FileDiskHandle, child.number * BLOCK_SIZE);
+    let childDirStruct = dirstruct.readDirStructFromDisk(FileDiskHandle, child.begin_num * BLOCK_SIZE);
     return {
         struct: childDirStruct,
-        number: child.number,
+        number: child.begin_num,
     }
 }
 
