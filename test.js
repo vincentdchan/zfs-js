@@ -15,8 +15,10 @@ let buf1 = Buffer.from([1,2,3,4]);
 
 // zfs.close(fd);
 
-zfs.createdir('/home');
+// zfs.createdir('/home');
 
+console.log(zfs.stat('/home'));
+console.log(zfs.listdir('/home'));
 fd = zfs.open('/home/cdz.txt', zfs.ZFILE_FLAG_WRITE);
 // zfs.write(fd, buf1, 0, 4);
 

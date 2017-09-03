@@ -239,7 +239,34 @@ exports.write = (fd, buf, offset, length) => {
 }
 
 exports.stat = (filename) => {
-    throw new Error("not implemented");
+    if (filename[0] != '/') {
+        throw new Error("The path must starts with '/'");
+    }
+    let slices = filename.split('/').slice(1);  // slice and remove the first element
+    let realname = slices[slices.length - 1];
+    let fatherResult = getFatherDirStruct(slices);
+    let dirItem = findChildFromDirStruct(fatherResult.struct, realname);
+    if (dirItem === null) {
+        // file not exists
+        return null;
+    } 
+    return dirItem;
+}
+
+exports.listdir = (filename) => {
+    if (filename[0] != '/') {
+        throw new Error("The path must starts with '/'");
+    }
+    let slices = filename.split('/').slice(1);  // slice and remove the first element
+    let realname = slices[slices.length - 1];
+    let fatherResult = getFatherDirStruct(slices);
+    let dirItem = findChildFromDirStruct(fatherResult.struct, realname);
+    if (dirItem === null) {
+        // file not exists
+        return null;
+    } 
+    let result = dirstruct.readDirStructFromDisk(FileDiskHandle, dirItem.begin_num * BLOCK_SIZE);
+    return result.data;
 }
 
 exports.remove = (filename) => {
