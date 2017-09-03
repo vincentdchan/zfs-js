@@ -31,6 +31,14 @@ for (let i = 0; i < BLOCK_NUM; i++) {
 FATBuffer[0] = 1;
 FATBuffer[1] = -1;
 
+function findHandle() {
+    let result = 0;
+    while (openedFileHandles[result] !== undefined) {
+        result++;
+    }
+    return result;
+}
+
 function ReadFAT(fd, fatBuffer) {
     let bytesNumber = 256 * 2;
     let buffer = Buffer.alloc(bytesNumber);
@@ -86,23 +94,31 @@ function findChildDirStructFromDirStruct(father, children_name) {
         throw new Error("target is not a dir");
     }
     let childDirStruct = dirstruct.readDirStructFromDisk(FileDiskHandle, child.number * BLOCK_SIZE);
-    return childDirStruct;
+    return {
+        struct: childDirStruct,
+        number: child.number,
+    }
 }
 
 function getFatherDirStruct(slices) {
-    let dirStruct = dirstruct.readDirStructFromDisk(FileDiskHandle, 1 * BLOCK_SIZE);
+    let blocknum = 1;
+    let dirStruct = dirstruct.readDirStructFromDisk(FileDiskHandle, blocknum * BLOCK_SIZE);
     if (slices.length > 1) {
         let dirSlices = slices.slice(0, slices.length - 1);
         for (let i = 0; i < dirSlices.length; i++) {
             let currentDirName = dirSlices[i];
-            let nextDirStruct = findChildDirStructFromDirStruct(dirStruct, currentDirName);
-            if (nextDirStruct === null) {
+            let nextDirStructResult = findChildDirStructFromDirStruct(dirStruct, currentDirName);
+            if (nextDirStructResult === null) {
                 throw new Error("'" + currentDirName + "'" + " doesn't exist.");
             }
-            dirStruct = nextDirStruct;
+            dirStruct = nextDirStructResult.struct;
+            blocknum = nextDirStructResult.number;
         }
     }
-    return dirStruct;
+    return {
+        struct: dirStruct,
+        number: blocknum,
+    };
 }
 
 exports.disconnect = () => {
@@ -114,8 +130,33 @@ exports.open = (filename, flag) => {
         throw new Error("The path must starts with '/'");
     }
     let slices = filename.split('/').slice(1);  // slice and remove the first element
-    let father = getFatherDirStruct(slices);
-    return 0;
+    let realname = slices[slices.length - 1];
+    let fatherResult = getFatherDirStruct(slices);
+    let dirItem = findChildFromDirStruct(fatherResult.struct, realname);
+    if (dirItem === null) {
+        // file not exists
+        if (flag & ZFILE_FLAG_WRITE) { // create the file
+            dirItem = new dirstruct.DirItem();
+            dirItem.name = realname;
+            dirItem.created_time = new Date().getTime();
+            dirItem.edited_time = new Date().getTime();
+
+            fatherResult.struct.data.push(dirItem);
+            dirstruct.writeDirStructToDisk(FileDiskHandle, fatherResult.number * BLOCK_SIZE, fatherResult.struct);
+        } else {
+            throw new Error("file not exists");
+        }
+    } 
+    let handle = findHandle();
+    let openedfile = new OpenedFile.OpenedFile();
+    openedfile.filename = filename;
+    openedfile.flag = flag;
+    openedFileHandles[handle] = openedfile
+    return handle;
+}
+
+exports.close = (handle) => {
+    openedFileHandles[handle] = undefined;
 }
 
 exports.read = () => {

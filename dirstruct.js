@@ -52,65 +52,36 @@ function writeDirStructToDisk(fd, offset, dirStruct) {
 class DirItem {
 
     constructor() {
-        this._name = "";
-        this._attr = 0;
-        this._type = 0;
-        this._size = 0;
-        this._number = 1;
-        this._created_time = new Date().getTime();
-        this._edited_time = new Date().getTime();
+        this.name = "";
+        this.attr = 0;
+        this.type = 0;
+        this.size = 0;
+        this.number = 1;
+        this.created_time = new Date().getTime();
+        this.edited_time = new Date().getTime();
     }
 
     toBytes() {
         let buf = Buffer.alloc(154);
-        buf.write(this._name, 0, 128, "utf8");
-        buf.writeInt8(this._attr, 128);
-        buf.writeInt8(this._type, 129);
-        this.writeInt32BE(this._size, 130);
-        this.writeInt32BE(this._number, 134);
-        this.writeIntBE(this._created_time, 138, 8);
-        this.writeIntBE(this._edited_time, 146, 8);
+        buf.write(this.name, 0, 128, "utf8");
+        buf.writeInt8(this.attr, 128);
+        buf.writeInt8(this.type, 129);
+        buf.writeInt32BE(this.size, 130);
+        buf.writeInt32BE(this.number, 134);
+        buf.writeIntBE(this.created_time, 138, 8);
+        buf.writeIntBE(this.edited_time, 146, 8);
         return buf;
     }
 
     fromBuffer(buffer) {
-        this._name = buffer.toString("utf8", 0, 128);
-        this._attr = buffer.readInt8(128);
-        this._type = buffer.readInt8(129);
-        this._size = buffer.readInt32BE(130);
-        this._number = buffer.readInt32BE(134);
-        this._created_time = buffer.readUintBE(138, 8);
-        this._edited_time = buffer.readUintBE(146, 8);
+        this.name = buffer.toString("utf8", 0, 128).split('\u0000')[0];
+        this.attr = buffer.readInt8(128);
+        this.type = buffer.readInt8(129);
+        this.size = buffer.readInt32BE(130);
+        this.number = buffer.readInt32BE(134);
+        this.created_time = buffer.readIntBE(138, 8);
+        this.edited_time = buffer.readIntBE(146, 8);
     }
-
-    get name() {
-        return this._name;
-    }
-
-    get attr() {
-        return this._attr;
-    }
-
-    get type() {
-        return this._type;
-    }
-
-    get size() {
-        return this._size;
-    }
-
-    get number() {
-        return this._number;
-    }
-
-    get created_time() {
-        return this._created_time;
-    }
-
-    get edited_time() {
-        return this._edited_time;
-    }
-
 
 }
 

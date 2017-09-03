@@ -1,6 +1,7 @@
 const zfs = require('./index.js');
 
 zfs.connect("test.disk");
-console.log(zfs.open('/test.txt'));
+let fd = zfs.open('/test.txt', zfs.ZFILE_FLAG_READ);
 console.log(zfs.read());
+zfs.close(fd);
 zfs.disconnect();
