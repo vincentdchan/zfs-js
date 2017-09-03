@@ -98,6 +98,12 @@ class DirStruct {
         this._data = []
     }
 
+    remove(realname) {
+        this._data = this._data.filter((value) => {
+            return value.name != realname;
+        });
+    }
+
     get data() {
         return this._data;
     }

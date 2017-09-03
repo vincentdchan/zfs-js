@@ -270,7 +270,27 @@ exports.listdir = (filename) => {
 }
 
 exports.remove = (filename) => {
+    if (filename[0] != '/') {
+        throw new Error("The path must starts with '/'");
+    }
+    let slices = filename.split('/').slice(1);  // slice and remove the first element
+    let realname = slices[slices.length - 1];
+    let fatherResult = getFatherDirStruct(slices);
+    let dirItem = findChildFromDirStruct(fatherResult.struct, realname);
+    if (dirItem === null) {
+        // file not exists
+        throw new Error("file not exists");
+    } 
+    fatherResult.struct.remove(realname);
+    dirstruct.writeDirStructToDisk(FileDiskHandle, fatherResult.number * BLOCK_SIZE, fatherResult.struct);
 
+    let begin_num = dirItem.begin_num;
+    while (begin_num !== -1) {
+        let tmp = begin_num;
+        begin_num = FATBuffer[begin_num];
+        FATBuffer[tmp] = 0;
+    }
+    WriteFAT(FileDiskHandle, FATBuffer);
 }
 
 exports.createdir = (filename) => {
