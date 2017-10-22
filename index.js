@@ -8,7 +8,8 @@ const dirstruct = require("./dirstruct");
 const OpenedFile = require('./openedfile');
 
 const BLOCK_SIZE = 4 * 1024;
-const BLOCK_NUM = 256
+// const BLOCK_NUM = 256
+const BLOCK_NUM = 64
 const FILEDISK_SIZE = BLOCK_NUM * BLOCK_SIZE;
 
 const ZFILE_FLAG_READ = 0x1;
@@ -18,18 +19,21 @@ const ZFILE_FLAG_APPEND = 0x4;
 const ZFILE_TYPE_FILE = 0x0;
 const ZFILE_TYPE_DIR = 0x1;
 
-let FATBuffer = [];
+const generateFATBuffer = () => {
+    let result = [];
+    for (let i = 0; i < BLOCK_NUM; i++) {
+        result.push(0);
+    }
+    result[0] = 1;
+    result[1] = -1;
+    return result;
+}
+
+let FATBuffer = generateFATBuffer();
 let FileDiskHandle;
 
 let openedFileHandles = [];
 openedFileHandles.length = 128;
-
-for (let i = 0; i < BLOCK_NUM; i++) {
-    FATBuffer.push(0);
-}
-
-FATBuffer[0] = 1;
-FATBuffer[1] = -1;
 
 function findHandle() {
     let result = 0;
@@ -49,8 +53,8 @@ function findNullFATBlockNum() {
 }
 
 function ReadFAT(fd, fatBuffer) {
-    let bytesNumber = 256 * 2;
-    let buffer = Buffer.alloc(bytesNumber);
+    const bytesNumber = BLOCK_NUM * 2;
+    const buffer = Buffer.alloc(bytesNumber);
     let offset = 0;
     while (offset < bytesNumber) {
         offset += fs.readSync(FileDiskHandle, buffer, offset, bytesNumber - offset, offset);
@@ -58,8 +62,8 @@ function ReadFAT(fd, fatBuffer) {
 }
 
 function WriteFAT(fd, fatBuffer) {
-    let bytesNumber = 256 * 2;
-    let buffer = Buffer.alloc(bytesNumber);
+    const bytesNumber = BLOCK_NUM * 2;
+    const buffer = Buffer.alloc(bytesNumber);
     for (let i = 0; i < 256; i++) {
         buffer.writeInt16BE(FATBuffer[i], i * 2, true);
     }
@@ -69,6 +73,7 @@ function WriteFAT(fd, fatBuffer) {
     }
 }
 
+// zfs连接到一个系统文件上
 exports.connect = (filedisk) => {
     if (fs.existsSync(filedisk)) {
         FileDiskHandle = fs.openSync(filedisk, 'r+');
@@ -86,6 +91,7 @@ exports.connect = (filedisk) => {
     }
 }
 
+// 从一个目录结构中找到一个子项
 function findChildFromDirStruct(father, children_name) {
     for (let i = 0; i < father.length; i++) {
         let item = father.data[i];
@@ -96,12 +102,14 @@ function findChildFromDirStruct(father, children_name) {
     return null;
 }
 
+// 从一个子目录中找到一个子目录，并读出来
 function findChildDirStructFromDirStruct(father, children_name) {
     let child = findChildFromDirStruct(father, children_name);
     if (child === null) return null;
     if (child.type !== ZFILE_TYPE_DIR ) {
         throw new Error("target is not a dir");
     }
+    console.log(child);
     let childDirStruct = dirstruct.readDirStructFromDisk(FileDiskHandle, child.begin_num * BLOCK_SIZE);
     return {
         struct: childDirStruct,
@@ -109,9 +117,10 @@ function findChildDirStructFromDirStruct(father, children_name) {
     }
 }
 
+// 找到一个地址的父目录结构
 function getFatherDirStruct(slices) {
     let blocknum = 1;
-    let dirStruct = dirstruct.readDirStructFromDisk(FileDiskHandle, blocknum * BLOCK_SIZE);
+    let dirStruct = dirstruct.readDirStructFromDisk(FileDiskHandle, blocknum * BLOCK_SIZE); // 根目录结构
     if (slices.length > 1) {
         let dirSlices = slices.slice(0, slices.length - 1);
         for (let i = 0; i < dirSlices.length; i++) {
@@ -153,6 +162,7 @@ exports.open = (filename, flag) => {
             dirItem.begin_num = beginBlockNum;
             dirItem.created_time = new Date().getTime();
             dirItem.edited_time = new Date().getTime();
+            console.log(beginBlockNum)
 
             fatherResult.struct.data.push(dirItem);
             dirstruct.writeDirStructToDisk(FileDiskHandle, fatherResult.number * BLOCK_SIZE, fatherResult.struct);
@@ -220,6 +230,7 @@ exports.write = (fd, buf, offset, length) => {
     if (openedFileHandles[fd] === undefined) 
         throw new Error("fd is not valid");
     let openedfile = openedFileHandles[fd];
+    console.log(openedfile);
     while (length > 0) {
         let bytesCount = Math.min(BLOCK_SIZE - openedfile.ptr_byte, length - offset);
         fs.writeSync(FileDiskHandle, buf, offset, bytesCount, openedfile.ptr_block * BLOCK_SIZE + openedfile.ptr_byte);
@@ -254,19 +265,24 @@ exports.stat = (filename) => {
 }
 
 exports.listdir = (filename) => {
-    if (filename[0] != '/') {
-        throw new Error("The path must starts with '/'");
+    if (filename == '/') {
+        let dirStruct = dirstruct.readDirStructFromDisk(FileDiskHandle, 1 * BLOCK_SIZE); // 根目录结构
+        return dirStruct.data;
+    } else {
+        if (filename[0] != '/') {
+            throw new Error("The path must starts with '/'");
+        }
+        let slices = filename.split('/').slice(1);  // slice and remove the first element
+        let realname = slices[slices.length - 1];
+        let fatherResult = getFatherDirStruct(slices);
+        let dirItem = findChildFromDirStruct(fatherResult.struct, realname);
+        if (dirItem === null) {
+            // file not exists
+            return null;
+        } 
+        let result = dirstruct.readDirStructFromDisk(FileDiskHandle, dirItem.begin_num * BLOCK_SIZE);
+        return result.data;
     }
-    let slices = filename.split('/').slice(1);  // slice and remove the first element
-    let realname = slices[slices.length - 1];
-    let fatherResult = getFatherDirStruct(slices);
-    let dirItem = findChildFromDirStruct(fatherResult.struct, realname);
-    if (dirItem === null) {
-        // file not exists
-        return null;
-    } 
-    let result = dirstruct.readDirStructFromDisk(FileDiskHandle, dirItem.begin_num * BLOCK_SIZE);
-    return result.data;
 }
 
 exports.remove = (filename) => {

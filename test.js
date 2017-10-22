@@ -17,12 +17,13 @@ let buf1 = Buffer.from([1,2,3,4]);
 
 // zfs.createdir('/home');
 
-zfs.remove('/home/cdz.txt');
-console.log(zfs.stat('/home'));
-console.log(zfs.listdir('/home'));
-// fd = zfs.open('/home/cdz.txt', zfs.ZFILE_FLAG_WRITE);
+// zfs.remove('/home/cdz.txt');
+// console.log(zfs.stat('/home'));
+// console.log(zfs.listdir('/home'));
+// fd = zfs.open('/zmy.txt', zfs.ZFILE_FLAG_WRITE);
 // zfs.write(fd, buf1, 0, 4);
+console.log(zfs.listdir('/'))
 
-zfs.close(fd);
+// zfs.close(fd);
 
 zfs.disconnect();
