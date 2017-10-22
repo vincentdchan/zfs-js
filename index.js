@@ -59,6 +59,9 @@ function ReadFAT(fd, fatBuffer) {
     while (offset < bytesNumber) {
         offset += fs.readSync(FileDiskHandle, buffer, offset, bytesNumber - offset, offset);
     }
+    for (let i = 0; i < BLOCK_NUM; i++) {
+        FATBuffer[i] = buffer.readInt16BE(i*2, true);
+    }
 }
 
 function WriteFAT(fd, fatBuffer) {
@@ -351,6 +354,10 @@ exports.createdir = (filename) => {
 
 exports.getFATValue = (index) => {
     return FATBuffer[index];
+}
+
+exports.getFATBuffer = () => {
+    return FATBuffer;
 }
 
 exports.ZFILE_FLAG_READ = ZFILE_FLAG_READ;
