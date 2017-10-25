@@ -273,6 +273,16 @@ exports.readAll = (fd) => {
     return buf;
 }
 
+function clearFAT(beginId) {
+    let nextId = FATBuffer[beginId];
+
+    while (nextId > 0) {
+        let tmp = FATBuffer[nextId];
+        FATBuffer[nextId] = -1;
+        nextId = tmp;
+    }
+}
+
 exports.writeAll = (fd, buf_or_str) => {
     if (openedFileHandles[fd] === undefined) 
         throw new Error("fd is not valid");
@@ -286,6 +296,9 @@ exports.writeAll = (fd, buf_or_str) => {
     } else {
         throw new Error("The second parameter of 'readAll' must be Buffer or String")
     }
+
+    // 清除FAT表，删除旧内容
+    clearFAT(openedfile.ptr_block);
 
     // 修改父目录相应的文件信息
     let dirStruct = dirstruct.readDirStructFromDisk(FileDiskHandle, 
@@ -413,22 +426,19 @@ exports.remove = (filename) => {
         throw new Error("The path must starts with '/'");
     }
     let slices = filename.split('/').slice(1);  // slice and remove the first element
-    let realname = slices[slices.length - 1];
+    let realname = path.basename(filename);
     let fatherResult = getFatherDirStruct(slices);
     let dirItem = findChildFromDirStruct(fatherResult.struct, realname);
     if (dirItem === null) {
         // file not exists
         throw new Error("file not exists");
     } 
+    let beginId = dirItem.begin_num;
+    clearFAT(beginId);
+
     fatherResult.struct.remove(realname);
     dirstruct.writeDirStructToDisk(FileDiskHandle, fatherResult.number * BLOCK_SIZE, fatherResult.struct);
 
-    let begin_num = dirItem.begin_num;
-    while (begin_num !== -1) {
-        let tmp = begin_num;
-        begin_num = FATBuffer[begin_num];
-        FATBuffer[tmp] = 0;
-    }
     WriteFAT(FileDiskHandle, FATBuffer);
 }
 
