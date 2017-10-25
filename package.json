@@ -1,6 +1,6 @@
 {
   "name": "zfs-js",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "main": "index.js",
   "repository": "https://github.com/ChannelOne/zfs-js",
   "author": "DZ Chan",

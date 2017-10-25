@@ -246,6 +246,7 @@ exports.readAll = (fd) => {
         throw new Error("fd is not valid");
     let openedfile = openedFileHandles[fd];
     let _size = openedfile.size;
+    if (_size === 0) return null;
     let buf = Buffer.alloc(_size);
 
     let sizeArr = chunkSize(_size, BLOCK_SIZE);
