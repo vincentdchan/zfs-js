@@ -6,9 +6,11 @@
 const fs = require("fs");
 const dirstruct = require("./dirstruct");
 const OpenedFile = require('./openedfile');
+const path = require('path');
 
-const BLOCK_SIZE = 4 * 1024;
+// const BLOCK_SIZE = 4 * 1024;
 // const BLOCK_NUM = 256
+const BLOCK_SIZE = 1024;
 const BLOCK_NUM = 64
 const FILEDISK_SIZE = BLOCK_NUM * BLOCK_SIZE;
 
@@ -112,7 +114,6 @@ function findChildDirStructFromDirStruct(father, children_name) {
     if (child.type !== ZFILE_TYPE_DIR ) {
         throw new Error("target is not a dir");
     }
-    console.log(child);
     let childDirStruct = dirstruct.readDirStructFromDisk(FileDiskHandle, child.begin_num * BLOCK_SIZE);
     return {
         struct: childDirStruct,
@@ -151,7 +152,7 @@ exports.open = (filename, flag) => {
         throw new Error("The path must starts with '/'");
     }
     let slices = filename.split('/').slice(1);  // slice and remove the first element
-    let realname = slices[slices.length - 1];
+    let realname = path.basename(filename);
     let fatherResult = getFatherDirStruct(slices);
     let dirItem = findChildFromDirStruct(fatherResult.struct, realname);
     if (dirItem === null) {
@@ -165,7 +166,6 @@ exports.open = (filename, flag) => {
             dirItem.begin_num = beginBlockNum;
             dirItem.created_time = new Date().getTime();
             dirItem.edited_time = new Date().getTime();
-            console.log(beginBlockNum)
 
             fatherResult.struct.data.push(dirItem);
             dirstruct.writeDirStructToDisk(FileDiskHandle, fatherResult.number * BLOCK_SIZE, fatherResult.struct);
@@ -183,6 +183,7 @@ exports.open = (filename, flag) => {
     openedfile.flag = flag;
     openedfile.size = dirItem.size;
     openedfile.ptr_block = openedfile.begin_num;
+    openedfile.dir_block_id = fatherResult.number;
     openedFileHandles[handle] = openedfile
     return handle;
 }
@@ -192,6 +193,7 @@ exports.close = (handle) => {
 }
 
 exports.seek = (fd, position) => {
+    console.error("此方法在2.0.0版本已被遗弃，请用readAll方法");
     if (openedFileHandles[fd] === undefined) 
         throw new Error("fd is not valid");
     let openedfile = openedFileHandles[fd];
@@ -208,7 +210,125 @@ exports.seek = (fd, position) => {
     openedfile.ptr_byte = blockOffset;
 }
 
+function chunkBuf(buf, size) {
+    let length = buf.length;
+    let num = parseInt(length / size);
+    let last_size = length % size;
+    let result = [];
+    for (let i = 0; i < num; i++) {
+        let tmpBuf = Buffer.alloc(size);
+        buf.copy(tmpBuf, 0, i * size, (i + 1) * size)
+        result.push(tmpBuf)
+    }
+    if (last_size > 0) {
+        let tmpBuf = Buffer.alloc(last_size)
+        buf.copy(tmpBuf, 0, num * size, num * size + last_size)
+        result.push(tmpBuf)
+    }
+    return result;
+}
+
+function chunkSize(number, size) {
+    let num = parseInt(number / size);
+    let last = number % size;
+    let result = [];
+    for (let i = 0; i < num; i++) {
+        result.push(size)
+    }
+    if (last > 0) {
+        result.push(last);
+    }
+    return result;
+}
+
+exports.readAll = (fd) => {
+    if (openedFileHandles[fd] === undefined) 
+        throw new Error("fd is not valid");
+    let openedfile = openedFileHandles[fd];
+    let _size = openedfile.size;
+    let buf = Buffer.alloc(_size);
+
+    let sizeArr = chunkSize(_size, BLOCK_SIZE);
+    let readBlock = openedfile.ptr_block;
+
+    let counter = 0;
+    let totalOffset = 0;
+    while (true) {
+        let readSize = sizeArr[counter];
+        let tmpBuf = Buffer.alloc(readSize);
+
+        fs.readSync(FileDiskHandle, tmpBuf, 0, readSize, 
+            readBlock * BLOCK_SIZE);
+
+        tmpBuf.copy(buf, totalOffset, 0, readSize);
+
+        totalOffset += readSize;
+        counter++;
+        readBlock = FATBuffer[readBlock];
+        if (readBlock < 0) {
+            break;
+        }
+    }
+
+    return buf;
+}
+
+exports.writeAll = (fd, buf_or_str) => {
+    if (openedFileHandles[fd] === undefined) 
+        throw new Error("fd is not valid");
+    let openedfile = openedFileHandles[fd];
+
+    let buf;
+    if (buf_or_str instanceof Buffer) {
+        buf = buf_or_str;
+    } else if (typeof buf_or_str == 'string') {
+        buf = Buffer.from(buf_or_str)
+    } else {
+        throw new Error("The second parameter of 'readAll' must be Buffer or String")
+    }
+
+    // 修改父目录相应的文件信息
+    let dirStruct = dirstruct.readDirStructFromDisk(FileDiskHandle, 
+        openedfile.dir_block_id * BLOCK_SIZE)
+    
+    let dirItem;
+    for (let i = 0; i < dirStruct.length; i++) {
+        let item = dirStruct.data[i];
+        let basename = path.basename(openedfile.filename);
+        if (item.name == basename) {
+            dirItem = item;
+            break;
+        }
+    }
+
+    dirItem.edited_time = new Date().getTime();
+    dirItem.size = buf.length;
+
+    dirstruct.writeDirStructToDisk(FileDiskHandle, 
+        openedfile.dir_block_id * BLOCK_SIZE, dirStruct)
+    
+    // 把内容写到文件里面 
+    let bufArr = chunkBuf(buf, BLOCK_SIZE);
+
+    let offset = 0;
+    let blockId = openedfile.ptr_block;
+    for (let i = 0; i < bufArr.length; i++) {
+        let buf = bufArr[i];
+        fs.writeSync(FileDiskHandle, buf, 0, buf.length, blockId * BLOCK_SIZE);
+
+        if (i != bufArr.length - 1) {
+            let newId = findHandle();
+            FATBuffer[blockId] = newId;
+            blockId = newId;
+        }
+    }
+
+    // 把FAT表写回文件
+    WriteFAT(FileDiskHandle, FATBuffer);
+}
+
 exports.read = (fd, buf, offset, length) => {
+    console.error("此方法在2.0.0版本已被遗弃，请用readAll方法");
     if (openedFileHandles[fd] === undefined) 
         throw new Error("fd is not valid");
     let openedfile = openedFileHandles[fd];
@@ -230,10 +350,10 @@ exports.read = (fd, buf, offset, length) => {
 }
 
 exports.write = (fd, buf, offset, length) => {
+    console.error("此方法在2.0.0版本已被遗弃，请用writeAll方法");
     if (openedFileHandles[fd] === undefined) 
         throw new Error("fd is not valid");
     let openedfile = openedFileHandles[fd];
-    console.log(openedfile);
     while (length > 0) {
         let bytesCount = Math.min(BLOCK_SIZE - openedfile.ptr_byte, length - offset);
         fs.writeSync(FileDiskHandle, buf, offset, bytesCount, openedfile.ptr_block * BLOCK_SIZE + openedfile.ptr_byte);

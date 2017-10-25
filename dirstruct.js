@@ -46,7 +46,7 @@ function writeDirStructToDisk(fd, offset, dirStruct) {
 // name: 128 bytes
 // attr: 1 byte
 // type: 1 byte
-// size: 4 bytes
+// size: 2 bytes
 // dir_num: 2 bytes
 // begin_num: 2bytes
 // created_time: 8 bytes
@@ -71,7 +71,7 @@ class DirItem {
         buf.write(this.name, 0, 128, "utf8");
         buf.writeInt8(this.attr, 128);
         buf.writeInt8(this.type, 129);
-        buf.writeInt32BE(this.size, 130);
+        buf.writeInt16BE(this.size, 130);
         buf.writeUInt16BE(this.dir_num, 132);
         buf.writeUInt16BE(this.begin_num, 134);
         buf.writeIntBE(this.created_time, 138, 8);
@@ -83,7 +83,7 @@ class DirItem {
         this.name = buffer.toString("utf8", 0, 128).split('\u0000')[0];
         this.attr = buffer.readInt8(128);
         this.type = buffer.readInt8(129);
-        this.size = buffer.readInt32BE(130);
+        this.size = buffer.readInt16BE(130);
         this.dir_num = buffer.readUInt16BE(132);
         this.begin_num = buffer.readUInt16BE(134);
         this.created_time = buffer.readIntBE(138, 8);

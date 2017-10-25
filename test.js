@@ -20,10 +20,12 @@ let buf1 = Buffer.from([1,2,3,4]);
 // zfs.remove('/home/cdz.txt');
 // console.log(zfs.stat('/home'));
 // console.log(zfs.listdir('/home'));
-// fd = zfs.open('/zmy.txt', zfs.ZFILE_FLAG_WRITE);
-// zfs.write(fd, buf1, 0, 4);
-console.log(zfs.listdir('/'))
+fd = zfs.open('/zmy.txt', zfs.ZFILE_FLAG_WRITE);
+// zfs.writeAll(fd, buf1);
+let buf = zfs.readAll(fd);
+console.log("content:",  buf);
+zfs.close(fd);
 
-// zfs.close(fd);
+// console.log(zfs.listdir('/'))
 
 zfs.disconnect();
