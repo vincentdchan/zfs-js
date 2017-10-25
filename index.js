@@ -435,6 +435,7 @@ exports.remove = (filename) => {
     } 
     let beginId = dirItem.begin_num;
     clearFAT(beginId);
+    FATBuffer[beginId] = -1;
 
     fatherResult.struct.remove(realname);
     dirstruct.writeDirStructToDisk(FileDiskHandle, fatherResult.number * BLOCK_SIZE, fatherResult.struct);
