@@ -278,7 +278,7 @@ function clearFAT(beginId) {
 
     while (nextId > 0) {
         let tmp = FATBuffer[nextId];
-        FATBuffer[nextId] = -1;
+        FATBuffer[nextId] = 0;
         nextId = tmp;
     }
 }
@@ -435,7 +435,7 @@ exports.remove = (filename) => {
     } 
     let beginId = dirItem.begin_num;
     clearFAT(beginId);
-    FATBuffer[beginId] = -1;
+    FATBuffer[beginId] = 0;
 
     fatherResult.struct.remove(realname);
     dirstruct.writeDirStructToDisk(FileDiskHandle, fatherResult.number * BLOCK_SIZE, fatherResult.struct);
