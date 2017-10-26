@@ -330,8 +330,9 @@ exports.writeAll = (fd, buf_or_str) => {
         let buf = bufArr[i];
         fs.writeSync(FileDiskHandle, buf, 0, buf.length, blockId * BLOCK_SIZE);
 
-        if (i != bufArr.length - 1) {
-            let newId = findHandle();
+        if (i !== bufArr.length - 1) {
+            let newId = findNullFATBlockNum();
+            FATBuffer[newId] = -1;
             FATBuffer[blockId] = newId;
             blockId = newId;
         }
