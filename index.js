@@ -21,6 +21,9 @@ const ZFILE_FLAG_APPEND = 0x4;
 const ZFILE_TYPE_FILE = 0x0;
 const ZFILE_TYPE_DIR = 0x1;
 
+const ZFILE_ATTR_DEFAULT = 0x0;
+const ZFILE_ATTR_READONLY = 0x1;
+
 const generateFATBuffer = () => {
     let result = [];
     for (let i = 0; i < BLOCK_NUM; i++) {
@@ -176,6 +179,9 @@ exports.open = (filename, flag) => {
             throw new Error("file not exists");
         }
     } 
+    if (dirItem.attr === ZFILE_ATTR_READONLY && flag === ZFILE_FLAG_WRITE) {
+        throw new Error("You are trying to write a readonly file");
+    }
     let handle = findHandle();
     let openedfile = new OpenedFile.OpenedFile();
     openedfile.filename = filename;
@@ -445,6 +451,22 @@ exports.remove = (filename) => {
     WriteFAT(FileDiskHandle, FATBuffer);
 }
 
+exports.changeAttr = (filename, attr) =>  {
+    if (filename[0] != '/') {
+        throw new Error("The path must starts with '/'");
+    }
+    let slices = filename.split('/').slice(1);  // slice and remove the first element
+    let realname = path.basename(filename);
+    let fatherResult = getFatherDirStruct(slices);
+    let dirItem = findChildFromDirStruct(fatherResult.struct, realname);
+    if (dirItem === null) {
+        // file not exists
+        throw new Error("file not exists");
+    } 
+    dirItem.attr = attr;
+    dirstruct.writeDirStructToDisk(FileDiskHandle, fatherResult.number * BLOCK_SIZE, fatherResult.struct);
+}
+
 exports.createdir = (filename) => {
     if (filename[0] != '/') {
         throw new Error("The path must starts with '/'");
@@ -496,3 +518,6 @@ exports.getFATBuffer = () => {
 exports.ZFILE_FLAG_READ = ZFILE_FLAG_READ;
 exports.ZFILE_FLAG_WRITE = ZFILE_FLAG_WRITE;
 exports.ZFILE_FLAG_APPEND = ZFILE_FLAG_APPEND;
+
+exports.ZFILE_ATTR_DEFAULT = ZFILE_ATTR_DEFAULT;
+exports.ZFILE_ATTR_READONLY = ZFILE_ATTR_READONLY;
