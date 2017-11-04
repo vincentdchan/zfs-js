@@ -288,6 +288,7 @@ function clearFAT(beginId) {
         FATBuffer[nextId] = 0;
         nextId = tmp;
     }
+    FATBuffer[beginId] = -1;
 }
 
 exports.writeAll = (fd, buf_or_str) => {
